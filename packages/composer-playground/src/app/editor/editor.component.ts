@@ -11,6 +11,7 @@ import { AdminService } from '../services/admin.service';
 import { ClientService } from '../services/client.service';
 import { AlertService } from '../basic-modals/alert.service';
 import { EditorService } from './editor.service';
+import { FileService } from '../services/file.service';
 
 import {
     ModelFile,
@@ -67,7 +68,8 @@ export class EditorComponent implements OnInit, OnDestroy {
                 private modalService: NgbModal,
                 private alertService: AlertService,
                 private editorService: EditorService,
-                private drawerService: DrawerService) {
+                private drawerService: DrawerService,
+                private fileService: FileService) {
 
     }
 
