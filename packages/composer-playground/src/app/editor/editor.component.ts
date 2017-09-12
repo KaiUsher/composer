@@ -242,7 +242,28 @@ export class EditorComponent implements OnInit, OnDestroy {
         this.files = newFiles;
     }
 
+    /*addModelFile() {
+        this.fileService.addFile(ID, CONTENT, 'model');
+    }
+
+    addScriptFile() {
+        this.fileService.addFile(ID, CONTENT, 'script');
+    }
+
+    addQueryFile() {
+        this.fileService.addFile(ID, CONTENT, 'query');
+    }
+
+    addRuleFile() {
+        this.fileService.addFile(ID, CONTENT, 'query');
+    }
+
+    addReadme() {
+        this.fileService.addFile(ID, CONTENT, 'query');
+    }*/
+
     addModelFile(contents = null) {
+        console.log('CONTENT', contents);
         let businessNetworkDefinition = this.clientService.getBusinessNetwork();
         let modelManager = businessNetworkDefinition.getModelManager();
         let code;
@@ -277,7 +298,7 @@ export class EditorComponent implements OnInit, OnDestroy {
         let scriptManager = businessNetworkDefinition.getScriptManager();
         let existingScripts = scriptManager.getScripts();
         let code;
-        let script;
+        let script: Script;
 
         if (!scriptFile) {
             let increment = 0;
@@ -297,6 +318,7 @@ export class EditorComponent implements OnInit, OnDestroy {
         }
 
         scriptManager.addScript(script);
+        this.fileService.addFile(script.getIdentifier(), code, 'script');
         this.updateFiles();
         let index = this.findFileIndex(true, script.getIdentifier());
         this.setCurrentFile(this.files[index]);

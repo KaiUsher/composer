@@ -7,6 +7,7 @@ import { IdentityService } from './identity.service';
 import { IdentityCardService } from './identity-card.service';
 import { AlertService } from '../basic-modals/alert.service';
 import { ConnectionProfileStoreService } from './connectionProfileStores/connectionprofilestore.service';
+import { FileService } from './file.service';
 
 import { BusinessNetworkConnection } from 'composer-client';
 import { BusinessNetworkDefinition, Util, ModelFile, Script, AclFile, QueryFile, TransactionDeclaration } from 'composer-common';
@@ -27,7 +28,8 @@ export class ClientService {
                 private identityCardService: IdentityCardService,
                 private alertService: AlertService,
                 private localStorageService: LocalStorageService,
-                private connectionProfileStoreService: ConnectionProfileStoreService) {
+                private connectionProfileStoreService: ConnectionProfileStoreService,
+                private fileService: FileService) {
     }
 
     // horrible hack for tests
