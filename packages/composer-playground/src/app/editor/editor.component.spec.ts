@@ -15,8 +15,10 @@ import { EditorService } from './editor.service';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { AlertService } from '../basic-modals/alert.service';
 import { ModelFile, Script, AclFile, QueryFile } from 'composer-common';
+import { EditorFile } from '../services/editor-file';
 import { ScrollToElementDirective } from '../directives/scroll/scroll-to-element.directive';
 import { BehaviorSubject } from 'rxjs/Rx';
+import { FileService } from '../services/file.service';
 
 import * as sinon from 'sinon';
 import * as chai from 'chai';
@@ -61,6 +63,7 @@ describe('EditorComponent', () => {
     let mockAdminService;
     let mockAlertService;
     let mockClientService;
+    let mockFileService;
     let mockModal;
     let mockDrawer;
     let mockModelFile;
@@ -73,6 +76,7 @@ describe('EditorComponent', () => {
         mockAdminService = sinon.createStubInstance(AdminService);
         mockAlertService = sinon.createStubInstance(AlertService);
         mockClientService = sinon.createStubInstance(ClientService);
+        mockFileService = sinon.createStubInstance(FileService);
         mockModal = sinon.createStubInstance(NgbModal);
         mockDrawer = sinon.createStubInstance(DrawerService);
         mockModelFile = sinon.createStubInstance(ModelFile);
@@ -96,6 +100,7 @@ describe('EditorComponent', () => {
                 {provide: NgbModal, useValue: mockModal},
                 {provide: AlertService, useValue: mockAlertService},
                 {provide: EditorService, useValue: editorService},
+                {provide: FileService, useValue: mockFileService},
                 {provide: DrawerService, useValue: mockDrawer}]
         });
 
@@ -1463,7 +1468,7 @@ describe('EditorComponent', () => {
         });
 
         it('should toggle editing', () => {
-            component['currentFile'] = {model : true};
+            component['currentFile'] = new EditorFile('1', '1', 'this is the model', 'model');
             component['editActive'] = false;
 
             component.toggleEditActive();
@@ -1477,7 +1482,7 @@ describe('EditorComponent', () => {
             component['deployedPackageVersion'] = '1.0.0';
 
             // Specify README file
-            let file = {readme: true, id: 'readme', displayID: 'README.md'};
+            let file = new EditorFile('readme', 'README.md', 'this is the readme', 'readme');
             component.setCurrentFile(file);
 
             fixture.detectChanges();
@@ -1514,7 +1519,7 @@ describe('EditorComponent', () => {
     describe('fileType', () => {
 
         it('should identify model file via parameters', () => {
-            let testItem = {model: true, displayID: 'test_name'};
+            let testItem = new EditorFile('1', '1', 'this is the model', 'model');
 
             let result = component['fileType'](testItem);
 
@@ -1522,7 +1527,7 @@ describe('EditorComponent', () => {
         });
 
         it('should identify script file via parameters', () => {
-            let testItem = {script: true, displayID: 'test_name'};
+            let testItem = new EditorFile('1', '1', 'this is the script', 'script');
 
             let result = component['fileType'](testItem);
 
@@ -1530,7 +1535,7 @@ describe('EditorComponent', () => {
         });
 
         it('should identify ACL file via parameters', () => {
-            let testItem = {acl: true, displayID: 'test_name'};
+            let testItem = new EditorFile('1', '1', 'this is the acl', 'acl');
 
             let result = component['fileType'](testItem);
 
@@ -1538,7 +1543,7 @@ describe('EditorComponent', () => {
         });
 
         it('should identify Query file via parameters', () => {
-            let testItem = {query: true, displayID: 'test_name'};
+            let testItem = new EditorFile('1', '1', 'this is the query', 'query');
 
             let result = component['fileType'](testItem);
 
@@ -1546,7 +1551,7 @@ describe('EditorComponent', () => {
         });
 
         it('should identify unknown file via parameters as README', () => {
-            let testItem = {displayID: 'test_name'};
+            let testItem = new EditorFile('1', '1', 'this is the octopus', 'octopus');
 
             let result = component['fileType'](testItem);
 
@@ -1783,12 +1788,12 @@ describe('EditorComponent', () => {
             component.openDeleteFileModal();
             tick();
 
-            // Check initial file set
-            mockSetIntialFile.should.have.been.called;
-
             // Check services called
             mockClientService.businessNetworkChanged$.next.should.have.been.called;
             mockAlertService.successStatus$.next.should.have.been.called;
+
+            // Check initial file set
+            mockSetIntialFile.should.have.been.called;
 
             // check remaining files
             let currentFiles = component['files'];
@@ -1931,7 +1936,7 @@ describe('EditorComponent', () => {
         it('should prevent edit of acl file', () => {
             // Attempt edit of ACL
             component['inputFileNameArray'] = ['', 'permissions', '.acl'];
-            component['currentFile'] = {acl: true};
+            component['currentFile'] = new EditorFile('1', '1', 'this is the acl', 'acl');
 
             component['editFileName']();
             component['fileNameError'].should.be.equal('Error: Unable to process rename on current file type');
@@ -1940,7 +1945,7 @@ describe('EditorComponent', () => {
         it('should prevent edit of readme file', () => {
             // Attempt edit of README
             component['inputFileNameArray'] = ['', 'README', '.md'];
-            component['currentFile'] = {readme: true};
+            component['currentFile'] = new EditorFile('1', '1', 'this is the readme', 'readme');
 
             component['editFileName']();
             component['fileNameError'].should.be.equal('Error: Unable to process rename on current file type');
@@ -1963,6 +1968,7 @@ describe('EditorComponent', () => {
             // Attempt edit of script
             component['inputFileNameArray'] = ['', 'myScriptFile', '.js'];
             component['currentFile'] = {script: true, id: 'myScriptFile.js'};
+            component['currentFile'] = new EditorFile('myScriptFile.js', 'myScriptFile.js', 'this is the script', 'script');
 
             component['files'] = [{id: 'muchRandom'},
                 {id: 'myScriptFile.js'},
@@ -1974,7 +1980,7 @@ describe('EditorComponent', () => {
         it('should not rename model file if name unchanged', () => {
             // Attempt edit of model
             component['inputFileNameArray'] = ['', 'myModelFile', '.cto'];
-            component['currentFile'] = {model: true, displayID: 'myModelFile.cto'};
+            component['currentFile'] = new EditorFile('myModelFile.cto', 'myModelFile.cto', 'this is the model', 'model');
 
             component['files'] = [{displayID: 'muchRandom'},
                 {displayID: 'myModelFile.cto'},
@@ -2001,7 +2007,7 @@ describe('EditorComponent', () => {
             });
 
             component['inputFileNameArray'] = ['', 'myNewScriptFile', '.js'];
-            component['currentFile'] = {script: true, id: 'myCurrentScriptFile.js'};
+            component['currentFile'] = new EditorFile('myCurrentScriptFile.js', 'myCurrentScriptFile.js', 'my script content', 'script');
 
             component['files'] = [{id: 'muchRandom'},
                 {id: 'myCurrentScriptFile.js'},
@@ -2034,7 +2040,7 @@ describe('EditorComponent', () => {
                 getDefinitions: sinon.stub().returns('My ModelFile content')
             });
             component['inputFileNameArray'] = ['', 'myNewModelFile', '.cto'];
-            component['currentFile'] = {model: true, id: 'myCurrentModelFile.cto'};
+            component['currentFile'] = new EditorFile('myCurrentFile.cto', 'myCurrentFile.cto', 'My ModelFile content', 'model');
 
             component['files'] = [{id: 'muchRandom'},
                 {displayID: 'myCurrentModelFile.cto'},
@@ -2118,51 +2124,41 @@ describe('EditorComponent', () => {
 
     describe('preventNameEdit', () => {
         it('should prevent name edit of acl', () => {
-            let resource = {
-                acl: true
-            };
+            let testFile = new EditorFile('1', '1', 'this is the acl', 'acl');
 
-            let response = component.preventNameEdit(resource);
+            let response = component.preventNameEdit(testFile);
 
             response.should.be.true;
         });
 
         it('should prevent name edit of query', () => {
-            let resource = {
-                query: true
-            };
+            let testFile = new EditorFile('1', '1', 'this is the query', 'query');
 
-            let response = component.preventNameEdit(resource);
+            let response = component.preventNameEdit(testFile);
 
             response.should.be.true;
         });
 
         it('should permit name edit of unknown', () => {
-            let resource = {
-                wombat: true
-            };
+            let testFile = new EditorFile('1', '1', 'this is the octopus', 'octopus');
 
-            let response = component.preventNameEdit(resource);
+            let response = component.preventNameEdit(testFile);
 
             response.should.be.false;
         });
 
         it('should permit name edit of model', () => {
-            let resource = {
-                model: true
-            };
+            let testFile = new EditorFile('1', '1', 'this is the model', 'model');
 
-            let response = component.preventNameEdit(resource);
+            let response = component.preventNameEdit(testFile);
 
             response.should.be.false;
         });
 
         it('should permit name edit of script', () => {
-            let resource = {
-                script: true
-            };
+            let testFile = new EditorFile('1', '1', 'this is the script', 'script');
 
-            let response = component.preventNameEdit(resource);
+            let response = component.preventNameEdit(testFile);
 
             response.should.be.false;
         });

@@ -15,6 +15,7 @@ import { AdminService } from './admin.service';
 import { AlertService } from '../basic-modals/alert.service';
 import { BusinessNetworkDefinition, ModelFile, Script, AclFile, QueryFile, ConnectionProfileStore, Util } from 'composer-common';
 import { BusinessNetworkConnection } from 'composer-client';
+import { FileService } from './file.service';
 import { IdentityService } from './identity.service';
 import { IdentityCardService } from './identity-card.service';
 import { LocalStorageService } from 'angular-2-local-storage';
@@ -67,7 +68,8 @@ describe('ClientService', () => {
                 {provide: IdentityService, useValue: identityServiceMock},
                 {provide: IdentityCardService, useValue: identityCardServiceMock},
                 {provide: LocalStorageService, useValue: mockLocalStorage},
-                {provide: ConnectionProfileStoreService, useValue: connectionProfileStoreServiceMock}]
+                {provide: ConnectionProfileStoreService, useValue: connectionProfileStoreServiceMock},
+                {provide: FileService}]
         });
     });
 
@@ -204,7 +206,6 @@ describe('ClientService', () => {
             modelManagerMock.updateModelFile.should.have.been.calledWith(modelFileMock);
             modelManagerMock.addModelFile.should.not.have.been.called;
             should.not.exist(result);
-            businessNetworkChangedSpy.should.have.been.calledWith(true);
         }));
 
         it('should replace a model file if id does not match namespace', inject([ClientService], (service: ClientService) => {
@@ -218,7 +219,6 @@ describe('ClientService', () => {
 
             modelManagerMock.addModelFile.should.have.been.calledWith(modelFileMock);
             should.not.exist(result);
-            businessNetworkChangedSpy.should.have.been.calledWith(true);
         }));
 
         it('should notify if model file namespace changes', inject([ClientService], (service: ClientService) => {
@@ -247,7 +247,6 @@ describe('ClientService', () => {
             scriptManagerMock.createScript.should.have.been.calledWith('script', 'JS', 'my-script');
             scriptManagerMock.addScript.should.have.been.calledWith(scriptFileMock);
             should.not.exist(result);
-            businessNetworkChangedSpy.should.have.been.calledWith(true);
         }));
 
         it('should update a acl file', inject([ClientService], (service: ClientService) => {
@@ -263,7 +262,6 @@ describe('ClientService', () => {
 
             aclManagerMock.setAclFile.should.have.been.calledWith(aclFileMock);
             should.not.exist(result);
-            businessNetworkChangedSpy.should.have.been.calledWith(true);
         }));
 
         it('should update a query file', inject([ClientService], (service: ClientService) => {
@@ -280,7 +278,6 @@ describe('ClientService', () => {
 
             queryManagerMock.setQueryFile.should.have.been.calledWith(queryFileMock);
             should.not.exist(result);
-            businessNetworkChangedSpy.should.have.been.calledWith(true);
         }));
 
         it('should update a package.json file', inject([ClientService], (service: ClientService) => {
@@ -312,7 +309,6 @@ describe('ClientService', () => {
             let result = service.updateFile('readme.md', 'read this', 'readme');
 
             mockSetReadme.should.have.been.calledWith('read this');
-            businessNetworkChangedSpy.should.have.been.calledWith(true);
         }));
 
         it('should not update a model file if invalid with a matching namespace', inject([ClientService], (service: ClientService) => {
@@ -332,7 +328,6 @@ describe('ClientService', () => {
             let result = service.updateFile('model-ns', 'my-model-content', 'model');
 
             result.should.equal('invalid');
-            businessNetworkChangedSpy.should.have.been.calledWith(false);
         }));
 
         it('should not replace a model file if id does not match namespace and file is invalid', inject([ClientService], (service: ClientService) => {
@@ -352,7 +347,6 @@ describe('ClientService', () => {
             let result = service.updateFile('model', 'my-model', 'model');
 
             result.should.equal('invalid');
-            businessNetworkChangedSpy.should.have.been.calledWith(false);
         }));
 
         it('should not update an invalid script file', inject([ClientService], (service: ClientService) => {
@@ -366,7 +360,6 @@ describe('ClientService', () => {
             let result = service.updateFile('script', 'my-script', 'script');
 
             result.should.equal('invalid');
-            businessNetworkChangedSpy.should.have.been.calledWith(false);
         }));
 
         it('should not update an invalid acl file', inject([ClientService], (service: ClientService) => {
@@ -379,7 +372,6 @@ describe('ClientService', () => {
 
             let result = service.updateFile('acl', 'my-acl', 'acl');
 
-            businessNetworkChangedSpy.should.have.been.calledWith(false);
             result.should.equal('invalid');
         }));
 
@@ -401,7 +393,6 @@ describe('ClientService', () => {
 
             result.should.equal('Error: The namespace collides with existing model namespace new-model');
             modelManagerMock.updateModelFile.should.not.have.been.called;
-            businessNetworkChangedSpy.should.have.been.calledWith(false);
         }));
 
         it('should return error message if type is invalid', inject([ClientService], (service: ClientService) => {
@@ -796,7 +787,6 @@ describe('ClientService', () => {
             service.setBusinessNetworkReadme('my readme');
 
             businessNetworkDefMock.setReadme.should.have.been.calledWith('my readme');
-            businessNetworkChangedSpy.should.have.been.calledWith(true);
         }));
 
         it('should set business network version', inject([ClientService], (service: ClientService) => {

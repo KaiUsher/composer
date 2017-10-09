@@ -12,6 +12,7 @@ import { ClientService } from '../services/client.service';
 import { AlertService } from '../basic-modals/alert.service';
 import { EditorService } from './editor.service';
 import { FileService } from '../services/file.service';
+import { EditorFile } from '../services/editor-file';
 
 import {
     ModelFile,
@@ -44,6 +45,7 @@ export class EditorComponent implements OnInit, OnDestroy {
     private addModelNamespace: string = 'models/org.acme.model';
     private addScriptFileName: string = 'lib/script';
     private addScriptFileExtension: string = '.js';
+    private addModelFileExtension: string = '.cto';
 
     private noError: boolean = true;
     private dirty: boolean = false;
@@ -70,7 +72,6 @@ export class EditorComponent implements OnInit, OnDestroy {
                 private editorService: EditorService,
                 private drawerService: DrawerService,
                 private fileService: FileService) {
-
     }
 
     ngOnInit(): Promise<any> {
@@ -122,7 +123,7 @@ export class EditorComponent implements OnInit, OnDestroy {
     setInitialFile() {
         if (this.files.length) {
             let initialFile = this.files.find((file) => {
-                return file.readme;
+                return file.isReadMe();
             });
             if (!initialFile) {
                 initialFile = this.files[0];
@@ -133,14 +134,14 @@ export class EditorComponent implements OnInit, OnDestroy {
 
     setCurrentFile(file) {
         this.listItem = 'editorFileList' + this.findFileIndex(true, file.id);
-        let always = (this.currentFile === null || file.readme || file.acl || file.query);
+        let always = (this.currentFile === null || file.isPackage() || file.isReadMe() || file.isAcl() || file.isQuery());
         let conditional = (always || this.currentFile.id !== file.id || this.currentFile.displayID !== file.displayID);
         if (always || conditional) {
             if (this.editingPackage) {
                 this.updatePackageInfo();
                 this.editingPackage = false;
             }
-            if (file.script || file.model || file.query) {
+            if (file.isScript() || file.isModel() || file.isQuery()) {
                 this.deletableFile = true;
             } else {
                 this.deletableFile = false;
@@ -175,163 +176,119 @@ export class EditorComponent implements OnInit, OnDestroy {
     }
 
     updateFiles() {
-        let newFiles = [];
-        // deal with model files
-        let modelFiles = this.clientService.getModelFiles();
-        let newModelFiles = [];
-        modelFiles.forEach((modelFile) => {
-            // ignore system model files
-            if (!modelFile.isSystemModelFile()) {
-                newModelFiles.push({
-                    model: true,
-                    id: modelFile.getNamespace(),
-                    displayID: modelFile.getName(),
-                });
-            }
-        });
-        newModelFiles.sort((a, b) => {
-            return a.displayID.localeCompare(b.displayID);
-        });
-        newFiles.push.apply(newFiles, newModelFiles);
+      if (this.fileService.getFiles().length !== 0) {
+        // we've already loaded the files previously this is just as we're swapping pages
+        this.files = this.fileService.getFiles();
+        return;
+      }
+      let modelFiles = this.clientService.getModelFiles();
+      modelFiles.forEach((modelFile) => {
+          // ignore system model files
+          if (!modelFile.isSystemModelFile()) {
+              this.fileService.addFile(modelFile.getNamespace(), modelFile.getName(), modelFile.getDefinitions(), 'model');
+          }
+      });
 
-        // deal with script files
-        let scriptFiles = this.clientService.getScripts();
-        let newScriptFiles = [];
-        scriptFiles.forEach((scriptFile) => {
-            newScriptFiles.push({
-                script: true,
-                id: scriptFile.getIdentifier(),
-                displayID: scriptFile.getIdentifier()
-            });
-        });
-        newScriptFiles.sort((a, b) => {
-            return a.displayID.localeCompare(b.displayID);
-        });
-        newFiles.push.apply(newFiles, newScriptFiles);
+      let scriptFiles = this.clientService.getScripts();
+      scriptFiles.forEach((scriptFile) => {
+          this.fileService.addFile(scriptFile.getIdentifier(), scriptFile.getIdentifier(), scriptFile.getContents(), 'script');
+      });
 
-        // deal with acl file
-        let aclFile = this.clientService.getAclFile();
-        if (aclFile) {
-            newFiles.push({
-                acl: true,
-                id: aclFile.getIdentifier(),
-                displayID: aclFile.getIdentifier()
-            });
-        }
+      let aclFile = this.clientService.getAclFile();
+      if (aclFile) {
+          this.fileService.addFile(aclFile.getIdentifier(), aclFile.getIdentifier(), aclFile.getDefinitions(), 'acl');
+      }
 
-        // deal with query
-        let queryFile = this.clientService.getQueryFile();
-        if (queryFile) {
-            newFiles.push({
-                query: true,
-                id: queryFile.getIdentifier(),
-                displayID: queryFile.getIdentifier()
-            });
-        }
+      let queryFile = this.clientService.getQueryFile();
+      if (queryFile) {
+          this.fileService.addFile(queryFile.getIdentifier(), queryFile.getIdentifier(), queryFile.getDefinitions(), 'query');
+      }
 
-        // deal with readme
-        let readme = this.clientService.getMetaData().getREADME();
-        if (readme) {
-            // add it first so it appears at the top of the list
-            newFiles.unshift({
-                readme: true,
-                id: 'readme',
-                displayID: 'README.md'
-            });
-        }
-        this.files = newFiles;
+      // deal with readme
+      let readme = this.clientService.getMetaData().getREADME();
+      if (readme) {
+          this.fileService.addFile('readme', 'README.md', readme, 'readme');
+      }
+
+      this.files = this.fileService.getFiles();
     }
-
-    /*addModelFile() {
-        this.fileService.addFile(ID, CONTENT, 'model');
-    }
-
-    addScriptFile() {
-        this.fileService.addFile(ID, CONTENT, 'script');
-    }
-
-    addQueryFile() {
-        this.fileService.addFile(ID, CONTENT, 'query');
-    }
-
-    addRuleFile() {
-        this.fileService.addFile(ID, CONTENT, 'query');
-    }
-
-    addReadme() {
-        this.fileService.addFile(ID, CONTENT, 'query');
-    }*/
 
     addModelFile(contents = null) {
-        console.log('CONTENT', contents);
-        let businessNetworkDefinition = this.clientService.getBusinessNetwork();
-        let modelManager = businessNetworkDefinition.getModelManager();
-        let code;
+      let code;
+      let modelName;
+      let newModelNamespace;
 
-        if (!contents) {
-            let newModelNamespace = this.addModelNamespace;
-            let increment = 0;
-            while (this.findFileIndex(true, newModelNamespace) !== -1) {
-                newModelNamespace = this.addModelNamespace + increment;
-                increment++;
-            }
+      if (!contents) {
+          newModelNamespace = this.addModelNamespace;
+          let increment = 0;
+          while (this.findFileIndex(true, newModelNamespace) !== -1) {
+              newModelNamespace = this.addModelNamespace + increment;
+              increment++;
+          }
 
-            code =
+          modelName = newModelNamespace + this.addModelFileExtension;
+          code =
                 `/**
-  * New model file
-  */
+                  * New model file
+                  */
 
-  namespace ${newModelNamespace}`;
-        } else {
-            code = contents;
-        }
+                  namespace ${newModelNamespace}`;
+      } else {
+          newModelNamespace = contents.namespace;
+          modelName = contents.fileName;
+          code = contents.definitions;
+      }
 
-        let newFile = modelManager.addModelFile(code);
-        this.updateFiles();
-        let index = this.findFileIndex(true, newFile.getNamespace());
-        this.setCurrentFile(this.files[index]);
-        this.dirty = true;
+      this.fileService.addFile(newModelNamespace, modelName, code, 'model');
+      this.setCurrentFile(this.fileService.getFile(newModelNamespace, 'model'));
+      this.files = this.fileService.getFiles();
+      this.dirty = true;
+      this.editorFilesValidate(); // ensure new file is put into clientService
     }
 
-    addScriptFile(scriptFile = null) {
-        let businessNetworkDefinition = this.clientService.getBusinessNetwork();
-        let scriptManager = businessNetworkDefinition.getScriptManager();
-        let existingScripts = scriptManager.getScripts();
+    addScriptFile(content = null) {
+        let scriptName;
         let code;
-        let script: Script;
 
-        if (!scriptFile) {
-            let increment = 0;
-            let scriptName = this.addScriptFileName + this.addScriptFileExtension;
-            while (existingScripts.findIndex((file) => file.getIdentifier() === scriptName) !== -1) {
-                scriptName = this.addScriptFileName + increment + this.addScriptFileExtension;
-                increment++;
-            }
+        if (!content) {
+          scriptName = this.addScriptFileName + this.addScriptFileExtension;
+          let increment = 1;
+          while (typeof this.fileService.getFile(scriptName, 'script') !== 'undefined') {
+              scriptName = this.addScriptFileName + increment + this.addScriptFileExtension;
+              increment++;
+          }
 
-            code =
-                `/**
-  * New script file
-  */`;
-            script = scriptManager.createScript(scriptName, 'JS', code);
+          code =
+          `/**
+          * New script file
+          */`;
+
         } else {
-            script = scriptFile;
+          scriptName = content.getIdentifier();
+          let increment = 1;
+          while (typeof this.fileService.getFile(scriptName, 'script') !== 'undefined') {
+              let fileName = content.getIdentifier();
+              let breakPoint = fileName.lastIndexOf('.');
+              scriptName = fileName.substring(0, breakPoint) + increment + fileName.substring(breakPoint, fileName.length);
+              increment++;
+          }
+          code = content.contents;
         }
-
-        scriptManager.addScript(script);
-        this.fileService.addFile(script.getIdentifier(), code, 'script');
-        this.updateFiles();
-        let index = this.findFileIndex(true, script.getIdentifier());
-        this.setCurrentFile(this.files[index]);
+        this.fileService.addFile(scriptName, scriptName, code, 'script');
+        this.setCurrentFile(this.fileService.getFile(scriptName, 'script'));
+        this.files = this.fileService.getFiles();
         this.dirty = true;
+        this.editorFilesValidate(); // ensure new file is put into clientService
     }
 
     addQueryFile(query) {
-        if (this.files.findIndex((file) => file.query === true) !== -1) {
+        if (this.files.findIndex((file) => file.isQuery() === true) !== -1) {
             const confirmModalRef = this.modalService.open(ReplaceComponent);
             confirmModalRef.componentInstance.mainMessage = 'Your current Query file will be replaced with the new one that you are uploading.';
             confirmModalRef.componentInstance.supplementaryMessage = 'Please ensure that you have saved a copy of your Query file to disc.';
             confirmModalRef.componentInstance.resource = 'file';
             confirmModalRef.result.then((result) => {
+                this.fileService.deleteFile(null, 'query');
                 this.processQueryFileAddition(query);
             }, (reason) => {
                 if (reason && reason !== 1) {
@@ -344,26 +301,25 @@ export class EditorComponent implements OnInit, OnDestroy {
     }
 
     processQueryFileAddition(query) {
-        let businessNetworkDefinition = this.clientService.getBusinessNetwork();
-        let queryManager: QueryManager = businessNetworkDefinition.getQueryManager();
-        queryManager.setQueryFile(query);
-        this.updateFiles();
-        let index = this.findFileIndex(true, query.getIdentifier());
-        this.setCurrentFile(this.files[index]);
+        this.fileService.addFile(query.getIdentifier(), query.getIdentifier(), query.getDefinitions(), 'query');
+        this.setCurrentFile(this.fileService.getQueryFile());
+        this.files = this.fileService.getFiles();
         this.dirty = true;
+        this.editorFilesValidate(); // ensure new file is put into clientService
     }
 
     addReadme(readme) {
-        if (this.files[0].readme) {
+        if (this.files[0].isReadMe()) {
             const confirmModalRef = this.modalService.open(ReplaceComponent);
             confirmModalRef.componentInstance.mainMessage = 'Your current README file will be replaced with the new one that you are uploading.';
             confirmModalRef.componentInstance.supplementaryMessage = 'Please ensure that you have saved a copy of your README file to disc.';
             confirmModalRef.componentInstance.resource = 'file';
             confirmModalRef.result.then((result) => {
                 this.clientService.setBusinessNetworkReadme(readme);
-                this.updateFiles();
+                this.files = this.fileService.getFiles();
                 this.setCurrentFile(this.files[0]);
                 this.dirty = true;
+                this.editorFilesValidate(); // ensure new file is put into clientService
             }, (reason) => {
                 if (reason && reason !== 1) {
                     this.alertService.errorStatus$.next(reason);
@@ -371,20 +327,21 @@ export class EditorComponent implements OnInit, OnDestroy {
             });
         } else {
             this.clientService.setBusinessNetworkReadme(readme);
-            this.updateFiles();
+            this.files = this.fileService.getFiles();
             this.setCurrentFile(this.files[0]);
             this.dirty = true;
         }
     }
 
     addRuleFile(rules) {
-        if (this.files.findIndex((file) => file.acl === true) !== -1) {
+        if (this.files.findIndex((file) => file.isAcl() === true) !== -1) {
             const confirmModalRef = this.modalService.open(ReplaceComponent);
             confirmModalRef.componentInstance.mainMessage = 'Your current ACL file will be replaced with the new one that you are uploading.';
             confirmModalRef.componentInstance.supplementaryMessage = 'Please ensure that you have saved a copy of your ACL file to disc.';
             confirmModalRef.componentInstance.resource = 'file';
             confirmModalRef.result.then((result) => {
-                this.processRuleFileAddition(rules);
+              this.fileService.deleteFile(null, 'acl');
+              this.processRuleFileAddition(rules);
             }, (reason) => {
                 if (reason && reason !== 1) {
                     this.alertService.errorStatus$.next(reason);
@@ -397,24 +354,23 @@ export class EditorComponent implements OnInit, OnDestroy {
     }
 
     processRuleFileAddition(rules) {
-        let businessNetworkDefinition = this.clientService.getBusinessNetwork();
-        let aclManager: AclManager = businessNetworkDefinition.getAclManager();
-        aclManager.setAclFile(rules);
-        this.updateFiles();
-        let index = this.findFileIndex(true, rules.getIdentifier());
-        this.setCurrentFile(this.files[index]);
+        this.fileService.addFile(rules.getIdentifier(), rules.getIdentifier(), rules.getDefinitions(), 'acl');
+        this.setCurrentFile(this.fileService.getAclFile());
+        this.files = this.fileService.getFiles();
         this.dirty = true;
+        this.editorFilesValidate(); // ensure new file is put into clientService
     }
 
     openImportModal() {
         const importModalRef = this.drawerService.open(UpdateComponent);
         importModalRef.componentInstance.finishedSampleImport.subscribe((result) => {
             if (result.deployed) {
+                this.fileService.deleteAllFiles();
                 this.updatePackageInfo();
                 this.updateFiles();
                 if (this.files.length) {
                     let currentFile = this.files.find((file) => {
-                        return file.readme;
+                        return file.isReadMe();
                     });
                     if (!currentFile) {
                         currentFile = this.files[0];
@@ -530,11 +486,8 @@ export class EditorComponent implements OnInit, OnDestroy {
     toggleEditActive() {
         this.editActive = !this.editActive;
         if (this.editActive && this.fileType(this.currentFile) === 'Readme') {
-            this.setCurrentFile({
-                package: true,
-                id: 'package',
-                displayID: 'package.json'
-            });
+            let mockPackageFile = new EditorFile('package', 'package.json', JSON.stringify(this.clientService.getMetaData().packageJson), 'package');
+            this.setCurrentFile(mockPackageFile);
             this.hideEdit();
         }
     }
@@ -549,25 +502,29 @@ export class EditorComponent implements OnInit, OnDestroy {
             let inputFileName = this.inputFileNameArray[0] + this.inputFileNameArray[1] + this.inputFileNameArray[2];
             if ((this.findFileIndex(false, inputFileName) !== -1) && (this.currentFile.displayID !== inputFileName)) {
                 this.fileNameError = 'Error: Filename already exists';
-            } else if (this.currentFile.script) {
+            } else if (this.currentFile.isScript()) {
                 if (this.currentFile.id !== inputFileName) {
                     // Replace Script
                     let contents = this.clientService.getScriptFile(this.currentFile.id).getContents();
                     this.clientService.replaceFile(this.currentFile.id, inputFileName, contents, 'script');
-                    this.updateFiles();
-                    let index = this.findFileIndex(true, inputFileName);
-                    this.setCurrentFile(this.files[index]);
+                    let newFile = this.fileService.replaceFile(this.currentFile.id, inputFileName, null, 'script'); // file service uses its own saved contents so can rename an invalid file
+                    this.files = this.fileService.getFiles();
+                    this.setCurrentFile(newFile);
                     this.dirty = true;
+                } else {
+                    this.editActive = false;
                 }
-            } else if (this.currentFile.model) {
+            } else if (this.currentFile.isModel()) {
                 if (this.currentFile.displayID !== inputFileName) {
                     // Update Model filename
                     let contents = this.clientService.getModelFile(this.currentFile.id).getDefinitions();
                     this.clientService.replaceFile(this.currentFile.id, inputFileName, contents, 'model');
-                    this.updateFiles();
-                    let index = this.findFileIndex(false, inputFileName);
-                    this.setCurrentFile(this.files[index]);
+                    let newFile = this.fileService.replaceFile(this.currentFile.id, inputFileName, contents, 'model'); // file service uses its own saved contents so it can use an invalid file, needs the last known good contents though so can get namespace if its can't from own contents
+                    this.files = this.fileService.getFiles();
+                    this.setCurrentFile(newFile);
                     this.dirty = true;
+                } else {
+                    this.editActive = false;
                 }
             } else {
                 this.fileNameError = 'Error: Unable to process rename on current file type';
@@ -600,22 +557,24 @@ export class EditorComponent implements OnInit, OnDestroy {
                         text: 'deleting ' + this.clientService.getBusinessNetworkName()
                     });
 
-                    if (deleteFile.script) {
+                    if (deleteFile.isScript()) {
                         let scriptManager: ScriptManager = this.clientService.getBusinessNetwork().getScriptManager();
                         scriptManager.deleteScript(deleteFile.id);
-                    } else if (deleteFile.model) {
+                        this.fileService.deleteFile(deleteFile.id, 'script');
+                    } else if (deleteFile.isModel()) {
                         let modelManager: ModelManager = this.clientService.getBusinessNetwork().getModelManager();
                         modelManager.deleteModelFile(deleteFile.id);
-                    } else if (deleteFile.query) {
+                        this.fileService.deleteFile(deleteFile.id, 'model');
+                    } else if (deleteFile.isQuery()) {
                         let queryManager: QueryManager = this.clientService.getBusinessNetwork().getQueryManager();
                         queryManager.deleteQueryFile();
+                        this.fileService.deleteFile(deleteFile.id, 'query');
                     } else {
                         throw new Error('Unable to process delete on selected file type');
                     }
 
                     // remove file from list view
-                    let index = this.findFileIndex(false, deleteFile.displayID);
-                    this.files.splice(index, 1);
+                    this.files = this.fileService.getFiles();
 
                     // Make sure we set a file to remove the deleted file from the view
                     this.setInitialFile();
@@ -647,22 +606,22 @@ export class EditorComponent implements OnInit, OnDestroy {
             });
     }
 
-    fileType(resource: any): string {
-        if (resource.model) {
+    fileType(resource: EditorFile): string {
+        if (resource.isModel()) {
             return 'Model';
-        } else if (resource.script) {
+        } else if (resource.isScript()) {
             return 'Script';
-        } else if (resource.acl) {
+        } else if (resource.isAcl()) {
             return 'ACL';
-        } else if (resource.query) {
+        } else if (resource.isQuery()) {
             return 'Query';
         } else {
             return 'Readme';
         }
     }
 
-    preventNameEdit(resource: any): boolean {
-        if (resource.acl || resource.query) {
+    preventNameEdit(resource: EditorFile): boolean {
+        if (resource.isAcl() || resource.isQuery()) {
             return true;
         } else {
             return false;
@@ -679,40 +638,60 @@ export class EditorComponent implements OnInit, OnDestroy {
 
     editorFilesValidate(): boolean {
         let allValid: boolean = true;
-
         for (let file of this.files) {
-            if (file.model) {
-                let modelFile = this.clientService.getModelFile(file.id);
-                if (this.clientService.validateFile(file.id, modelFile.getDefinitions(), 'model') !== null) {
+            if (file.isModel()) {
+                if (this.fileService.validateFile(file.id, 'model', this.clientService.getModelFiles(false)) !== null) {
                     allValid = false;
                     file.invalid = true;
                 } else {
                     file.invalid = false;
+                    if (this.clientService.getModelFile(file.id)) {
+                      this.clientService.updateFile(file.id, file.content, 'model');
+                    } else {
+                      this.clientService.getBusinessNetwork().getModelManager().addModelFile(file.content);
+                    }
                 }
-            } else if (file.acl) {
-                let aclFile = this.clientService.getAclFile();
-                if (this.clientService.validateFile(file.id, aclFile.getDefinitions(), 'acl') !== null) {
+            } else if (file.isAcl()) {
+                if (this.fileService.validateFile(file.id, 'acl', this.clientService.getModelFiles(false)) !== null) {
                     allValid = false;
                     file.invalid = true;
                 } else {
                     file.invalid = false;
+                    if (this.clientService.getAclFile()) {
+                      this.clientService.updateFile(file.id, file.content, 'acl');
+                    } else {
+                      let aclFile = this.clientService.createAclFile(file.id, file.content);
+                      this.clientService.getBusinessNetwork().getAclManager().setAclFile(aclFile);
+                    }
                 }
-            } else if (file.script) {
-                let script = this.clientService.getScriptFile(file.id);
-                if (this.clientService.validateFile(file.id, script.getContents(), 'script') !== null) {
+            } else if (file.isScript()) {
+                if (this.fileService.validateFile(file.id, 'script', this.clientService.getModelFiles(false)) !== null) {
                     allValid = false;
                     file.invalid = true;
                 } else {
                     file.invalid = false;
+                    if (this.clientService.getScriptFile(file.id)) {
+                      this.clientService.updateFile(file.id, file.content, 'script');
+                    } else {
+                      let script = this.clientService.createScriptFile(file.id, 'JS', file.content);
+                      this.clientService.getBusinessNetwork().getScriptManager().addScript(script);
+                    }
                 }
-            } else if (file.query) {
-                let query = this.clientService.getQueryFile();
-                if (this.clientService.validateFile(file.id, query.getDefinitions(), 'query') !== null) {
+            } else if (file.isQuery()) {
+                if (this.fileService.validateFile(file.id, 'query', this.clientService.getModelFiles(false)) !== null) {
                     allValid = false;
                     file.invalid = true;
                 } else {
                     file.invalid = false;
+                    if (this.clientService.getQueryFile()) {
+                      this.clientService.updateFile(file.id, file.content, 'query');
+                    } else {
+                      let query = this.clientService.createQueryFile(file.id, file.content);
+                      this.clientService.getBusinessNetwork().getQueryManager().setQueryFile(query);
+                    }
                 }
+            } else if (file.isReadMe()) {
+                // this.clientService.updateFile(file.id, file.content, 'readme');
             }
         }
         return allValid;

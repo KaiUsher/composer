@@ -79,6 +79,7 @@ module.exports.FSConnectionProfileStore = require('./lib/fsconnectionprofilestor
 module.exports.FunctionDeclaration = require('./lib/introspect/functiondeclaration');
 module.exports.Globalize = require('./lib/globalize');
 module.exports.IdCard = require('./lib/idcard');
+module.exports.IllegalModelException = require('./lib/introspect/illegalmodelexception');
 module.exports.Introspector = require('./lib/introspect/introspector');
 module.exports.Limit = require('./lib/query/limit');
 module.exports.Logger = require('./lib/log/logger');

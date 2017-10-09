@@ -86,8 +86,12 @@ export class ClientService {
         return this.getBusinessNetwork().getModelManager().getModelFile(id);
     }
 
-    getModelFiles(): ModelFile[] {
-        return this.getBusinessNetwork().getModelManager().getModelFiles();
+    getModelFiles(getSystemModels = true): ModelFile[] {
+        let models = this.getBusinessNetwork().getModelManager().getModelFiles();
+        models = models.filter( (obj) => {
+          return getSystemModels || !obj.systemModelFile;
+        });
+        return models;
     }
 
     getScriptFile(id: string): Script {
@@ -176,11 +180,10 @@ export class ClientService {
                     break;
                 default:
                     throw new Error('Attempted update of unknown file of type: ' + type);
+                    // network changed removed to avoid infinite loop, updated when setCurrentCode is called
             }
-            this.businessNetworkChanged$.next(true);
             return null;
         } catch (e) {
-            this.businessNetworkChanged$.next(false);
             return e.toString();
         }
     }
@@ -220,7 +223,7 @@ export class ClientService {
 
     setBusinessNetworkReadme(readme) {
         this.getBusinessNetwork().setReadme(readme);
-        this.businessNetworkChanged$.next(true);
+        // business network changed is updated by the fileservice changing
     }
 
     setBusinessNetworkVersion(version: string) {

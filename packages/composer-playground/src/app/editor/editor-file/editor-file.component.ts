@@ -1,6 +1,8 @@
 import { Component, Input } from '@angular/core';
 
+import { FileService } from '../../services/file.service';
 import { ClientService } from '../../services/client.service';
+import { EditorComponent } from '../editor.component';
 
 import * as marked from 'marked';
 
@@ -81,56 +83,56 @@ export class EditorFileComponent {
         this._previewReadmeActive = previewReadme;
     }
 
-    constructor(private clientService: ClientService) {
+    constructor(private fileService: FileService, private clientService: ClientService) {
     }
 
     loadFile() {
         this.changingCurrentFile = true;
         this.currentError = null;
-        if (this._editorFile.model) {
-            let modelFile = this.clientService.getModelFile(this._editorFile.id);
+        if (this._editorFile.isModel()) {
+            let modelFile = this.fileService.getFile(this._editorFile.id, 'model');
             if (modelFile) {
-                this.editorContent = modelFile.getDefinitions();
+                this.editorContent = modelFile.getContent();
                 this.editorType = 'code';
-                this.currentError = this.clientService.validateFile(this._editorFile.id, this.editorContent, 'model');
+                this.currentError = this.fileService.validateFile(this._editorFile.id, 'model', this.clientService.getModelFiles(false));
             } else {
                 this.editorContent = null;
             }
-        } else if (this._editorFile.script) {
-            let script = this.clientService.getScriptFile(this._editorFile.id);
+        } else if (this._editorFile.isScript()) {
+            let script = this.fileService.getFile(this._editorFile.id, 'script');
             if (script) {
-                this.editorContent = script.getContents();
+                this.editorContent = script.getContent();
                 this.editorType = 'code';
-                this.currentError = this.clientService.validateFile(this._editorFile.id, this.editorContent, 'script');
+                this.currentError = this.fileService.validateFile(this._editorFile.id, 'script', this.clientService.getModelFiles(false));
             } else {
                 this.editorContent = null;
             }
-        } else if (this._editorFile.acl) {
-            let aclFile = this.clientService.getAclFile();
+        } else if (this._editorFile.isAcl()) {
+            let aclFile = this.fileService.getFile(this._editorFile.id, 'acl');
             if (aclFile) {
-                this.editorContent = aclFile.getDefinitions();
+                this.editorContent = aclFile.getContent();
                 this.editorType = 'code';
-                this.currentError = this.clientService.validateFile(this._editorFile.id, this.editorContent, 'acl');
+                this.currentError = this.fileService.validateFile(this._editorFile.id, 'acl', this.clientService.getModelFiles(false));
             } else {
                 this.editorContent = null;
             }
-        } else if (this._editorFile.package) {
+        } else if (this._editorFile.isPackage()) {
             let packageJson = this.clientService.getMetaData().getPackageJson();
             this.editorContent = JSON.stringify(packageJson, null, 2);
             this.editorType = 'code';
-        } else if (this._editorFile.readme) {
-            let readme = this.clientService.getMetaData().getREADME();
+        } else if (this._editorFile.isReadMe()) {
+            let readme = this.fileService.getFile(this._editorFile.id, 'readme');
             if (readme) {
-                this.editorContent = readme;
-                this.previewContent = marked(readme);
+                this.editorContent = readme.getContent();
+                this.previewContent = marked(readme.getContent());
                 this.editorType = 'readme';
             }
-        } else if (this._editorFile.query) {
-          let queryFile = this.clientService.getQueryFile();
+        } else if (this._editorFile.isQuery()) {
+          let queryFile = this.fileService.getFile(this._editorFile.id, 'query');
           if (queryFile) {
-              this.editorContent = queryFile.getDefinitions();
+              this.editorContent = queryFile.getContent();
               this.editorType = 'code';
-              this.currentError = this.clientService.validateFile(this._editorFile.id, this.editorContent, 'query');
+              this.currentError = this.fileService.validateFile(this._editorFile.id, 'query', this.clientService.getModelFiles(false));
           } else {
               this.editorContent = null;
           }
@@ -143,28 +145,33 @@ export class EditorFileComponent {
 
     setCurrentCode() {
         let type: string;
+        this.currentError = null;
         try {
-            if (this._editorFile.model) {
+            if (this._editorFile.isModel()) {
                 type = 'model';
-            } else if (this._editorFile.script) {
+            } else if (this._editorFile.isScript()) {
                 type = 'script';
-            } else if (this._editorFile.acl) {
+            } else if (this._editorFile.isAcl()) {
                 type = 'acl';
-            } else if (this._editorFile.query) {
+            } else if (this._editorFile.isQuery()) {
                 type = 'query';
-            } else if (this._editorFile.package) {
-                type = 'package';
-            } else if (this._editorFile.readme) {
+            } else if (this._editorFile.isPackage()) {
+                let packageObject = JSON.parse(this.editorContent);
+                this.clientService.setBusinessNetworkPackageJson(packageObject);
+            } else if (this._editorFile.isReadMe()) {
                 type = 'readme';
                 this.previewContent = marked(this.editorContent);
             } else {
                 throw new Error('unknown file type');
             }
-
-            this.currentError = this.clientService.updateFile(this._editorFile.id, this.editorContent, type);
+            if (!this._editorFile.isPackage()) {
+              // package isn't part of file service so can't update the file
+              this.fileService.updateFile(this._editorFile.id, this.editorContent, type);
+              this.currentError = this.fileService.validateFile(this._editorFile.id, type, this.clientService.getModelFiles(false));
+            }
+            this.clientService.businessNetworkChanged$.next(true);
         } catch (e) {
             this.currentError = e.toString();
-
             this.clientService.businessNetworkChanged$.next(false);
         }
     }
