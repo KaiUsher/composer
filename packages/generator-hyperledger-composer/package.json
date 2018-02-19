@@ -1,10 +1,14 @@
 {
   "name": "generator-hyperledger-composer",
-<<<<<<< HEAD
+ master
   "version": "0.17.6",
-=======
-  "version": "0.17.3",
->>>>>>> Assets almost complete
+
+ HEAD
+  "version": "0.17.6",
+
+  "version": "0.17.6",
+ Assets almost complete
+ angular-testing
   "description": "Generates projects from Hyperledger Composer business network definitions",
   "engines": {
     "node": ">=8",
@@ -17,13 +21,18 @@
     "test": "mocha -t 0 test/*.js"
   },
   "dependencies": {
-<<<<<<< HEAD
+master
     "composer-client": "0.17.6",
     "composer-common": "0.17.6",
-=======
-    "composer-client": "0.17.3",
-    "composer-common": "0.17.3",
->>>>>>> Assets almost complete
+
+ HEAD
+    "composer-client": "0.17.6",
+    "composer-common": "0.17.6",
+
+    "composer-client": "0.17.6",
+    "composer-common": "0.17.6",
+ Assets almost complete
+ angular-testing
     "shelljs": "0.7.7",
     "underscore.string": "3.3.4",
     "yeoman-generator": "0.24.1",
@@ -37,13 +46,18 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@angular/cli": "1.0.0-rc.0",
-<<<<<<< HEAD
+ master
     "composer-admin": "0.17.6",
     "composer-connector-embedded": "0.17.6",
-=======
-    "composer-admin": "0.17.3",
-    "composer-connector-embedded": "0.17.3",
->>>>>>> Assets almost complete
+
+ HEAD
+    "composer-admin": "0.17.6",
+    "composer-connector-embedded": "0.17.6",
+
+    "composer-admin": "0.17.6",
+    "composer-connector-embedded": "0.17.6",
+ Assets almost complete
+ angular-testing
     "mocha": "3.4.2",
     "typings": "2.1.0",
     "yeoman-assert": "3.0.0",
