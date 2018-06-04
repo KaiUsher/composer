@@ -30,7 +30,7 @@ Feature: Angular Application Generator
             | --license | Apache-2.0 |
             | --cardName | admin@test-network |
             | --apiServer | generate |
-            | --apiPort | 3000 |
+            | --apiPort | 4040 |
             | --apiNamespace | never |
         Then I have the following files
             | ../my-angular-app/src/app/app.module.ts |
